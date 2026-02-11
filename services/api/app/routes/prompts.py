@@ -1,11 +1,13 @@
+import json
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ..core.db import get_db
-from ..models import Prompt
+from ..models import Prompt, Response
 from ..schemas.prompt import PromptCreate, PromptRead
+from ..schemas.response import ResponseCreate, ResponseRead
 
 router = APIRouter(prefix="/prompts", tags=["prompts"])
 
@@ -117,6 +119,46 @@ def get_prompt_by_id(prompt_id: int, db: Session = Depends(get_db)):
         )
 
     return prompt
+
+
+@router.post(
+    "/{prompt_id}/responses",
+    response_model=ResponseRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_response(
+    prompt_id: int,
+    payload: ResponseCreate,
+    db: Session = Depends(get_db),
+):
+    """
+    Create a response for a prompt. Computes embedding via embedding module
+    and stores it; if embedding is not yet implemented, response is created
+    with embedding=NULL.
+    """
+    prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+    if not prompt:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Prompt {prompt_id} not found",
+        )
+
+    response = Response(prompt_id=prompt_id, text=payload.text)
+    db.add(response)
+    db.commit()
+    db.refresh(response)
+
+    try:
+        from services.embedding.tfidf import embed
+
+        vec = embed(payload.text)
+        response.embedding = json.dumps([float(x) for x in vec])
+        db.commit()
+        db.refresh(response)
+    except NotImplementedError:
+        pass
+
+    return response
 
 
 @router.delete("/{prompt_id}", status_code=status.HTTP_204_NO_CONTENT)

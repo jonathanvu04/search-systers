@@ -2,7 +2,7 @@ from fastapi import FastAPI
 
 from .core.db import Base, engine
 from .core.cors import *  # if you later configure CORS here
-from .routes import prompts
+from .routes import prompts, responses
 
 app = FastAPI(title="search-systers API")
 
@@ -24,3 +24,4 @@ def health_check() -> dict:
 
 
 app.include_router(prompts.router)
+app.include_router(responses.router)

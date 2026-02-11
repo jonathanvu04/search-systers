@@ -40,3 +40,11 @@ def rank_texts(
     top_k: int | None = None,
 ) -> List[ScoredText]:
     raise NotImplementedError("Your teammate should implement this")
+
+
+def embed(text: str) -> List[float]:
+    """
+    Input: response text. Output: vector as list of floats for DB storage.
+    Your teammate implements TF-IDF (or other) to produce the embedding.
+    """
+    raise NotImplementedError("Your teammate should implement this")
