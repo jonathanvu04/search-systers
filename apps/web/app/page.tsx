@@ -10,7 +10,7 @@ type Prompt = {
 
 async function fetchTodayPrompt(): Promise<Prompt | null> {
   try {
-    const res = await fetch("http://127.0.0.1:8000/prompts/2", {
+    const res = await fetch("http://127.0.0.1:8000/prompts/3", {
       // Don't cache during development so you always see the latest prompt.
       cache: "no-store",
     });
