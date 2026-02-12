@@ -14,3 +14,28 @@ def get_top_k_similar(
     Your teammate implements cosine similarity or equivalent.
     """
     raise NotImplementedError("Your teammate should implement this")
+
+
+def cosine(query_vector: np.ndarray, candidate_vector: np.ndarray) -> float:
+    #returns the cosine similarity between two 1D vectors. 1d
+    '''
+    if return 0.0 means no magnitude and the embedding prob off 
+    - empty text
+    - embedding failed, etc
+    
+    similarity = (query · candidate) / (||query|| * ||candidate||)
+    '''
+    
+    query_norm = np.linalg.norm(query_vector) # Vector mags - Euclidean Norm
+    candidate_norm = np.linalg.norm(candidate_vector)
+
+    
+    if query_norm == 0.0 or candidate_norm == 0.0:
+        return 0.0
+
+    # https://www.geeksforgeeks.org/python/how-to-calculate-cosine-similarity-in-python/
+    return float(
+        np.dot(query_vector, candidate_vector) / (query_norm * candidate_norm)
+    )
+    
+    
