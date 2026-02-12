@@ -1,5 +1,6 @@
-from typing import List
-
+from typing import List, tuple
+from __future__ import annotations
+import numpy as np
 
 def get_top_k_similar(
     current_embedding: list[float],
