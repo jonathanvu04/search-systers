@@ -1,21 +1,13 @@
-from datetime import date, datetime
+from datetime import datetime
 
 from pydantic import BaseModel
 
 
-class PromptBase(BaseModel):
+class PromptCreate(BaseModel):
     text: str
-    reveal_date: date
 
 
-class PromptCreate(PromptBase):
-    pass
-
-
-class PromptRead(PromptBase):
+class PromptRead(BaseModel):
     id: int
-    created_at: datetime | None
-
-    class Config:
-        from_attributes = True
-
+    text: str
+    created_at: datetime | str | None = None

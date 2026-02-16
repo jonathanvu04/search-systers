@@ -1,21 +1,18 @@
+import sys
+from pathlib import Path
+
+# Add project root so services.embedding and services.ranking are findable
+_root = Path(__file__).resolve().parents[3]
+if str(_root) not in sys.path:
+    sys.path.insert(0, str(_root))
+
 from fastapi import FastAPI
 
-from .core.db import Base, engine
-from .core.cors import *  # if you later configure CORS here
+from .core.cors import setup_cors
 from .routes import prompts, responses
 
 app = FastAPI(title="search-systers API")
-
-
-@app.on_event("startup")
-def on_startup() -> None:
-    """
-    Create database tables on startup.
-
-    For larger projects you might use Alembic migrations instead,
-    but for now this ensures our SQLite prompts table exists.
-    """
-    Base.metadata.create_all(bind=engine)
+setup_cors(app)
 
 
 @app.get("/health")

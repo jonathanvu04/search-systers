@@ -1,37 +1,28 @@
-import { PromptCard } from "../components/PromptCard";
-import { ResponseBox } from "../components/ResponseBox";
+import { PromptResponseForm } from "../components/PromptResponseForm";
+import { supabase } from "../lib/supabase";
 
 type Prompt = {
   id: number;
   text: string;
-  reveal_date: string;
   created_at: string | null;
 };
 
-async function fetchTodayPrompt(): Promise<Prompt | null> {
-  try {
-    const res = await fetch("http://127.0.0.1:8000/prompts/3", {
-      // Don't cache during development so you always see the latest prompt.
-      cache: "no-store",
-    });
+async function fetchPrompt(promptId: number): Promise<Prompt | null> {
+  const { data, error } = await supabase
+    .from("prompts")
+    .select("*")
+    .eq("id", promptId)
+    .single();
 
-    if (!res.ok) {
-      return null;
-    }
-
-    return res.json();
-  } catch {
-    // If the API is down, fall back to a default prompt.
-    return null;
-  }
+  if (error || !data) return null;
+  return data as Prompt;
 }
 
 export default async function Home() {
-  const prompt = await fetchTodayPrompt();
+  const promptId = 1; // Your prompt: "What gets you up in the morning?"
+  const prompt = await fetchPrompt(promptId);
 
-  const promptText =
-    prompt?.text ?? "What gets you up in the morning?";
-  const revealDate = prompt?.reveal_date ?? "";
+  const promptText = prompt?.text ?? "Error";
 
   return (
     <main className="min-h-screen bg-[#F5EAD5] px-4 py-10 md:py-16">
@@ -46,10 +37,10 @@ export default async function Home() {
         </header>
 
         <div className="w-full flex justify-center">
-          <div className="w-full max-w-xl">
-            <PromptCard prompt={promptText} revealDate={revealDate} />
-            <ResponseBox />
-          </div>
+          <PromptResponseForm
+            promptId={prompt?.id ?? 1}
+            promptText={promptText}
+          />
         </div>
       </div>
     </main>

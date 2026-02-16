@@ -11,10 +11,7 @@ class ResponseRead(BaseModel):
     id: int
     prompt_id: int
     text: str
-    created_at: datetime | None
-
-    class Config:
-        from_attributes = True
+    created_at: datetime | str | None = None
 
 
 class SimilarItem(BaseModel):

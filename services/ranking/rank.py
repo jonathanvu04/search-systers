@@ -1,19 +1,29 @@
-from typing import List, tuple
 from __future__ import annotations
+
+from typing import List, Tuple
 import numpy as np
 
 def get_top_k_similar(
     current_embedding: list[float],
     current_response_id: int,
-    others: list[tuple[int, list[float]]],
+    others: list[Tuple[int, list[float]]],
     top_k: int,
-) -> list[tuple[int, float]]:
+) -> list[Tuple[int, float]]:
     """
     Input: current response embedding, its id, list of (response_id, embedding).
     Output: top-k (response_id, score) ordered by similarity (exclude current).
-    Your teammate implements cosine similarity or equivalent.
+    Uses cosine similarity; embeddings are L2-normalized so dot = cosine.
     """
-    raise NotImplementedError("Your teammate should implement this")
+    curr = np.array(current_embedding, dtype=np.float64)
+    scores: list[tuple[int, float]] = []
+    for rid, other_emb in others:
+        if rid == current_response_id:
+            continue
+        cand = np.array(other_emb, dtype=np.float64)
+        s = cosine(curr, cand)
+        scores.append((rid, s))
+    scores.sort(key=lambda x: x[1], reverse=True)
+    return scores[:top_k]
 
 
 def cosine(query_vector: np.ndarray, candidate_vector: np.ndarray) -> float:
