@@ -1,74 +1,76 @@
-from typing import List, Tuple
 from __future__ import annotations
+from typing import List, Tuple
 import numpy as np
+
+
+def cosine(query_vector: np.ndarray, candidate_vector: np.ndarray) -> float:
+    """
+    Compute cosine similarity between two 1D vectors.
+
+    Returns 0.0 if either vector has zero magnitude.
+    """
+    query_norm = np.linalg.norm(query_vector)
+    candidate_norm = np.linalg.norm(candidate_vector)
+
+    if query_norm == 0.0 or candidate_norm == 0.0:
+        return 0.0
+
+    return float(np.dot(query_vector, candidate_vector) / (query_norm * candidate_norm))
+
 
 def get_top_k_similar(
     current_embedding: list[float],
     current_response_id: int,
     others: list[tuple[int, list[float]]],
     top_k: int,
+    min_score: float = 0.0,
 ) -> list[tuple[int, float]]:
     """
-    Input: current response embedding, its id, list of (response_id, embedding).
-    Output: top-k (response_id, score) ordered by similarity (exclude current).
-    Your teammate implements cosine similarity or equivalent.
-    
-    This function:
-    1. Receives a query embedding (the user's response)
-    2. Compares it to candidate embeddings
-    3. Computes cosine similarity for each
-    4. Returns the top-k most similar responses
-    
-    returns: 
-    List of tuples:
-        [(response_id, similarity_score), ...]
-        Sorted in descending order by similarity.
-    """
-    # Convert query embedding to NumPy array once for efficiency
-    q = np.asarray(current_embedding, dtype=np.float32)
+    Rank candidate responses by cosine similarity.
 
-    # In the format (response_id, similarity_score)
+    Inputs:
+    - current_embedding: embedding of the current/query response
+    - current_response_id: ID of the query response
+    - others: list of (response_id, embedding) candidate responses
+    - top_k: number of results to return
+    - min_score: optional minimum similarity threshold
+
+    Returns:
+    - list of (response_id, similarity_score), sorted descending
+    """
+
+    if top_k <= 0:
+        return []
+
+    query_vector = np.asarray(current_embedding, dtype=np.float32)
+    if query_vector.ndim != 1 or query_vector.size == 0:
+        return []
+
+    expected_dim = query_vector.shape[0]
     scored: List[Tuple[int, float]] = []
 
-
-    for resp_id, emb in others:
-        # exclude itself
-        if resp_id == current_response_id:
+    for response_id, embedding in others:
+        # Exclude the current response itself
+        if response_id == current_response_id:
             continue
 
-        # Convert candidate embedding to NumPy array
-        v = np.asarray(emb, dtype=np.float32)
+        candidate_vector = np.asarray(embedding, dtype=np.float32)
 
-        similarity = cosine(q, v)
-        scored.append((resp_id, similarity))
+        # Skip malformed candidate embeddings
+        if candidate_vector.ndim != 1:
+            continue
+        if candidate_vector.size == 0:
+            continue
+        if candidate_vector.shape[0] != expected_dim:
+            continue
 
-    # Sort by similarity score in descending order
+        similarity_score = cosine(query_vector, candidate_vector)
+
+        # Keep only candidates above the minimum relevance threshold
+        if similarity_score >= min_score:
+            scored.append((response_id, similarity_score))
+
+
     scored.sort(key=lambda x: x[1], reverse=True)
 
     return scored[:top_k]
-   # raise NotImplementedError("Your teammate should implement this")
-
-
-def cosine(query_vector: np.ndarray, candidate_vector: np.ndarray) -> float:
-    #returns the cosine similarity between two 1D vectors. 1d
-    '''
-    if return 0.0 means no magnitude and the embedding prob off 
-    - empty text
-    - embedding failed, etc
-    
-    similarity = (query dot candidate) / (||query|| * ||candidate||)
-    '''
-    
-    query_norm = np.linalg.norm(query_vector) # Vector mags - Euclidean Norm
-    candidate_norm = np.linalg.norm(candidate_vector)
-
-    
-    if query_norm == 0.0 or candidate_norm == 0.0:
-        return 0.0
-
-    # https://www.geeksforgeeks.org/python/how-to-calculate-cosine-similarity-in-python/
-    return float(
-        np.dot(query_vector, candidate_vector) / (query_norm * candidate_norm)
-    )
-    
-    
