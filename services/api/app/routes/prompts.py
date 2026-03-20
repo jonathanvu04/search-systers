@@ -62,6 +62,53 @@ def get_prompt_by_id(prompt_id: int):
     return r.data[0]
 
 
+@router.get("/{prompt_id}/responses")
+def get_responses_by_age(
+    prompt_id: int,
+    age_min: int | None = None,
+    age_max: int | None = None,
+):
+    """
+    Fetch responses for a prompt, optionally filtered by the responder's age.
+
+    Joins responses → profiles to get age. Responses without a linked profile
+    are excluded when an age filter is active.
+    """
+    _supabase_check()
+
+    r = (
+        supabase.table("responses")
+        .select("id, text, user_id, profiles(name, age)")
+        .eq("prompt_id", prompt_id)
+        .order("id")
+        .execute()
+    )
+    rows = r.data or []
+
+    results = []
+    for row in rows:
+        profile = row.get("profiles")
+        age = profile.get("age") if profile else None
+        name = profile.get("name") if profile else None
+
+        if age_min is not None or age_max is not None:
+            if age is None:
+                continue
+            if age_min is not None and age < age_min:
+                continue
+            if age_max is not None and age > age_max:
+                continue
+
+        results.append({
+            "id": row["id"],
+            "text": row["text"],
+            "name": name,
+            "age": age,
+        })
+
+    return results
+
+
 @router.delete("/{prompt_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_prompt(prompt_id: int):
     """Delete a prompt by ID."""

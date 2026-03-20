@@ -9,7 +9,7 @@ if str(_root) not in sys.path:
 from fastapi import FastAPI
 
 from .core.cors import setup_cors
-from .routes import prompts, responses
+from .routes import profiles, prompts, responses
 
 app = FastAPI(title="search-systers API")
 setup_cors(app)
@@ -20,5 +20,6 @@ def health_check() -> dict:
     return {"status": "ok"}
 
 
+app.include_router(profiles.router)
 app.include_router(prompts.router)
 app.include_router(responses.router)

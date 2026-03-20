@@ -13,7 +13,9 @@ out/
 # Python
 __pycache__/
 .venv/
+venv/
 *.pyc
+*.db
 
 # Editor
 .vscode/

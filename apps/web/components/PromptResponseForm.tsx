@@ -7,6 +7,20 @@ import { ResponseCard } from "./ResponseCard";
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 type SimilarResponse = { id: number; text: string; score: number };
+type AgeResponse = { id: number; text: string; name: string | null; age: number | null };
+const SIMILAR_TOP_K = 4;
+
+const AGE_FILTERS = [
+  { label: "10–20", min: 10, max: 20 },
+  { label: "20–30", min: 20, max: 30 },
+  { label: "30–40", min: 30, max: 40 },
+  { label: "40–50", min: 40, max: 50 },
+  { label: "50–60", min: 50, max: 60 },
+  { label: "60–70", min: 60, max: 70 },
+  { label: "70+",   min: 70, max: 120 },
+] as const;
+
+type ActiveFilter = "similar" | string; // "similar" or "10–20", "20–30", etc.
 
 interface PromptResponseFormProps {
   promptId: number;
@@ -17,7 +31,12 @@ export function PromptResponseForm({ promptId, promptText }: PromptResponseFormP
   const [text, setText] = useState("");
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>("similar");
   const [similarResponses, setSimilarResponses] = useState<SimilarResponse[]>([]);
+  const [ageResponses, setAgeResponses] = useState<AgeResponse[]>([]);
+  const [filterLoading, setFilterLoading] = useState(false);
+  const [lastResponseId, setLastResponseId] = useState<number | null>(null);
 
   async function handleSubmit() {
     const trimmed = text.trim();
@@ -30,41 +49,40 @@ export function PromptResponseForm({ promptId, promptText }: PromptResponseFormP
     setError(null);
     setStatus("submitting");
     setSimilarResponses([]);
+    setAgeResponses([]);
+    setActiveFilter("similar");
 
     try {
-      // Step 1: Insert response into Supabase
-      const { data: inserted, error: insertError } = await supabase
-        .from("responses")
-        .insert({ prompt_id: promptId, text: trimmed })
-        .select("id")
-        .single();
-
-      if (insertError) {
-        throw new Error(insertError.message);
-      }
-
-      const responseId = inserted?.id;
-      if (!responseId) {
-        throw new Error("No response ID returned");
-      }
-
-      // Step 2: Call API to compute and store embeddings for all responses
-      const embedRes = await fetch(`${API_URL}/responses/${responseId}/embed`, {
+      // Attach user_id if the user is signed in
+      const { data: { user } } = await supabase.auth.getUser();
+      const submitRes = await fetch(`${API_URL}/responses/submit`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt_id: promptId,
+          text: trimmed,
+          user_id: user?.id ?? null,
+        }),
       });
 
-      if (!embedRes.ok) {
-        const errBody = await embedRes.text();
-        throw new Error(`Embedding failed: ${embedRes.status} ${errBody}`);
+      if (!submitRes.ok) {
+        const errBody = await submitRes.text();
+        throw new Error(`Submit failed: ${submitRes.status} ${errBody}`);
       }
+      const submitData: { response_id: number } = await submitRes.json();
+      const responseId = submitData.response_id;
+      if (!responseId) throw new Error("No response ID returned");
+      setLastResponseId(responseId);
 
-      // Step 3: Fetch top 3 similar responses
       const similarRes = await fetch(
-        `${API_URL}/responses/${responseId}/similar?top_k=3`
+        `${API_URL}/responses/${responseId}/similar?top_k=${SIMILAR_TOP_K}`
       );
       if (similarRes.ok) {
         const similar: SimilarResponse[] = await similarRes.json();
-        setSimilarResponses(similar);
+        const filtered = similar
+          .filter((item) => item.id !== responseId)
+          .slice(0, SIMILAR_TOP_K);
+        setSimilarResponses(filtered);
       }
 
       setText("");
@@ -74,6 +92,35 @@ export function PromptResponseForm({ promptId, promptText }: PromptResponseFormP
       setStatus("error");
     }
   }
+
+  async function handleFilterChange(filter: ActiveFilter) {
+    setActiveFilter(filter);
+
+    if (filter === "similar") return;
+
+    const range = AGE_FILTERS.find((f) => f.label === filter);
+    if (!range) return;
+
+    setFilterLoading(true);
+    try {
+      const res = await fetch(
+        `${API_URL}/prompts/${promptId}/responses?age_min=${range.min}&age_max=${range.max}`
+      );
+      if (res.ok) {
+        const data: AgeResponse[] = await res.json();
+        const filtered = lastResponseId == null
+          ? data
+          : data.filter((item) => item.id !== lastResponseId);
+        setAgeResponses(filtered);
+      }
+    } catch {
+      setAgeResponses([]);
+    } finally {
+      setFilterLoading(false);
+    }
+  }
+
+  const hasResults = status === "success" && (similarResponses.length > 0 || lastResponseId);
 
   return (
     <div className="w-full max-w-xl">
@@ -113,21 +160,73 @@ export function PromptResponseForm({ promptId, promptText }: PromptResponseFormP
         )}
       </div>
 
-      {similarResponses.length > 0 && (
+      {hasResults && (
         <div className="mt-8 w-full">
-          <h2 className="mb-3 text-sm font-medium text-slate-600">
-            Similar responses
-          </h2>
-          <div className="flex flex-col gap-3">
-            {similarResponses.map((item, i) => (
-              <ResponseCard
-                key={item.id}
-                text={item.text}
-                score={item.score}
-                rank={i + 1}
-              />
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              onClick={() => handleFilterChange("similar")}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                activeFilter === "similar"
+                  ? "bg-[#538BAC] text-white"
+                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              Similar
+            </button>
+            {AGE_FILTERS.map((f) => (
+              <button
+                key={f.label}
+                onClick={() => handleFilterChange(f.label)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  activeFilter === f.label
+                    ? "bg-[#538BAC] text-white"
+                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                {f.label}
+              </button>
             ))}
           </div>
+
+          {filterLoading && (
+            <p className="text-sm text-slate-400">Loading…</p>
+          )}
+
+          {activeFilter === "similar" && !filterLoading && (
+            <div className="flex flex-col gap-3">
+              {similarResponses.length > 0 ? (
+                similarResponses.map((item, i) => (
+                  <ResponseCard
+                    key={item.id}
+                    text={item.text}
+                    score={item.score}
+                    rank={i + 1}
+                  />
+                ))
+              ) : (
+                <p className="text-sm text-slate-400">No similar responses found.</p>
+              )}
+            </div>
+          )}
+
+          {activeFilter !== "similar" && !filterLoading && (
+            <div className="flex flex-col gap-3">
+              {ageResponses.length > 0 ? (
+                ageResponses.map((item) => (
+                  <ResponseCard
+                    key={item.id}
+                    text={item.text}
+                    name={item.name}
+                    age={item.age}
+                  />
+                ))
+              ) : (
+                <p className="text-sm text-slate-400">
+                  No responses from this age group.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
